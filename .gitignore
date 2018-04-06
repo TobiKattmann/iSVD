@@ -1,0 +1,14 @@
+# temporarily not to commit
+LaTeX_documentation
+sphinx_documentation
+
+# LaTeX specific
+*.aux
+*.log
+*.pdf
+*.toc
+*.out
+
+# python specific
+*.swp
+__pycache__
