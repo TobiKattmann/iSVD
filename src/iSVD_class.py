@@ -136,6 +136,7 @@ class iSVD:
         self.decomp[j][0], self.decomp[j][1] , self.decomp[j][2] = iSVD_func.reshape_SVD(U_tmp, S_tmp, V_tmp, self.k)
     # Done
   #----------------------------------------------------------------------#
+
   def initial_SVD(self):
     """Creates initial exact SVD on first k snapshots."""
     io = IO()
