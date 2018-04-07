@@ -1,5 +1,4 @@
 # temporarily not to commit
-LaTeX_documentation
 sphinx_documentation
 
 # LaTeX specific
@@ -8,6 +7,10 @@ sphinx_documentation
 *.pdf
 *.toc
 *.out
+*.bbl
+*.blg
+*.xml
+*blx.bib
 
 # python specific
 *.swp

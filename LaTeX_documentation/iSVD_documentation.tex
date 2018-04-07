@@ -1,0 +1,133 @@
+\documentclass[10pt]{article}
+\usepackage[top=60pt,bottom=60pt,left=96pt,right=92pt]{geometry}
+%\usepackage[utf8]{inputenc}
+\usepackage{amssymb} % for "real numbers" sign
+\usepackage{amsmath}  % for align environment
+\usepackage{mathtools} % for :=
+\usepackage{hyperref}
+
+\usepackage{xcolor}
+
+\usepackage{algpseudocode}
+\usepackage{algorithm}
+
+\usepackage[backend=bibtex]{biblatex}
+\addbibresource{bibliography.bib}
+%-------------------------------------------------------------------------------------------------------%
+%#######################################################################################################%
+%-------------------------------------------------------------------------------------------------------%
+\begin{document}
+%-------------------------------------------------------------------------------------------------------%
+\title{iSVD for transient flow data compression}
+\author{Tobias Kattmann}
+\maketitle
+\tableofcontents
+%-------------------------------------------------------------------------------------------------------%
+%#######################################################################################################%
+%-------------------------------------------------------------------------------------------------------%
+\section{Theory}
+Disclaimer: In this work only real matrices are considered such that the adjoint (conjugate-transpose) of a  matrix is simply its transpose.
+%-------------------------------------------------------------------------------------------------------%
+\subsection{SVD}
+The Singular Value Decomposition is a factorization of a $m\!\times\! n$ matrix $\mathbf{M}$. For every matrix $\mathbf{M}$ exists a factorization:
+\begin{equation}
+	\mathbf{M} = \mathbf{U}\mathbf{\Sigma}\mathbf{V}^T
+\end{equation}
+where
+\begin{itemize}
+	\item $\mathbf{U}$ is an $m\!\times\! m$ orthogonal matrix (unitary, if $\mathbf{M}$ complex). The columns of $\mathbf{U}$ are called left-singular-vectors of $\mathbf{M}$.
+	\item $\mathbf{\Sigma}$ is a diagonal $m\!\times\! n$ with non negative real numbers. Entires $\sigma_i$ of $\mathbf{\Sigma}$ are called singular values of  $\mathbf{M}$ and are (as a common convention) in descending order. Therefore $\mathbf{\Sigma}$ is unique whereas $\mathbf{U}$ and $\mathbf{V}$ are not (Note: They are unique if the columns are unit-length vectors).
+	\item $\mathbf{V}$ is a $n\!\times\! n$ orthogonal matrix. The columns of $\mathbf{V}$ are called right-singular-vectors of $\mathbf{M}$.
+\end{itemize}
+The SVD of a matrix can be computed based on the following observations:
+\begin{itemize}
+	\item The columns of $\mathbf{U}$ (left-singular-vectors of $\mathbf{M}$) are a set of orthonormal eigenvectors of $\mathbf{M}\mathbf{M}^T$.
+	\item The non-zero singular values of $\mathbf{M}$ are the square roots of the non-zero eigenvalues of both, $\mathbf{M}\mathbf{M}^T$ and $\mathbf{M}^T\mathbf{M}$.
+	\item The columns of $\mathbf{V}$ (right-singular-vectors of $\mathbf{M}$) are a set of orthonormal eigenvectors of $\mathbf{M}^T\mathbf{M}$.
+\end{itemize}
+Another intuitive way of explanation is the following. A non negative real number $\sigma$ is a singular value for $\mathbf{M}$ if and only if there exist unit-length vectors $u$ $(m\!\times\! 1)$ and $v$ $(n\!\times\! 1)$ such that:
+\begin{equation}
+	\mathbf{M}u = \sigma u \quad\text{and}\quad \mathbf{M}^T v = \sigma v
+\end{equation}
+Some additional restrictions can be made by exploiting the fact, that $\mathbf{M}$ is not a square matrix but $m\!\times\! n$. An $m\!\times\! n$ matrix $\mathbf{M}$ has at most $p=min(m,n)$ distinct singular values. If wlog $m>n$ then $p=n$ and the SVD shrinks down to:
+\begin{equation}
+	\mathbf{M} = \mathbf{U}^{m\!\times\! n} \mathbf{\Sigma}^{n\!\times\! n} {\mathbf{V}^T}^{n\!\times\! n}
+\end{equation}
+Note that no loss of information is incorporated in this operation. 
+%-------------------------------------------------------------------------------------------------------%
+\subsection{Low-rank approximation SVD}
+A wanted loss of information can be achieved via low-rank approximation of $\mathbf{M}$ which we will call $\textbf{\~M}$. In the case that the approximation is based on minimizing the Frobenius norm of the difference between $\mathbf{M}$ and $\textbf{\~M}$ under the constraint that $rank(\textbf{\~M})=r$ it turns out that the solution is given by the SVD of $\mathbf{M}$:
+\begin{equation}
+	\textbf{\~M}=\mathbf{U} \mathbf{\tilde\Sigma} \mathbf{V}^T,
+\end{equation}
+where $\mathbf{\tilde\Sigma}$ is the same matrix as $\mathbf{\Sigma}$ from the original SVD, except that it contains only the $r$ largest singular values. This is known as the Eckhart-Young theorem. In terms of matrix shapes one can save the factorization of the approximated matrix more effectively by exploiting that $\mathbf{\tilde\Sigma}$ has only $r$ entries:
+\begin{equation}
+\textbf{\~M}^{m\!\times\! n}=\mathbf{U}^{m\!\times\! r} \mathbf{\tilde\Sigma}^{r\!\times\! r} {\mathbf{V}^T}^{r\!\times\! n}.
+\end{equation}
+which greatly reduces size if $r\ll p$.
+\subsubsection{Proof of optimality for low-rank matrix approximation}
+Eckhart-Young theorem
+%-------------------------------------------------------------------------------------------------------%
+\subsection{Incremental SVD (iSVD)}
+In this subsection the algorithm for performing the incremental SVD \cite{Balzano2013} is presented. 
+
+In the application of SVD for data compression it is might be too costly to store the whole dataset at once. Therefore an application of SVD and the subsequent low-rank approximation is not possible. In our application of transient flow simulations the matrix \textbf{M} consists of the state vector of a timestep in each column. Considering a mesh with 1e6 DOF's, 1e4 timesteps the standard size of a C++ double 8bytes, one already has a matrix which needs 80GB's of storage.
+
+A possible solution to this remedy is the incremental SVD where the columns of \textbf{M} can be added to the intermediate SVD subsequently without the need to be stored afterwards. In practice this means, at each timestep the iSVD is updated and the state vector can be omitted afterwards and only the low-rank approximation is kept. The rank of the approximation can be chosen to influence the quality of the approximation. An application of iSVD in the context of a continuous adjoint code for flow simulations is presented here \cite{Vezyris2014}, \cite{Vezyris2015}.
+\begin{algorithm}
+\caption{Incremental SVD}
+\begin{algorithmic}
+\State Compute initial SVD with first $r$ snapshots
+\State $M_r = U_r \Sigma_r V_r^T$
+\State $t \coloneqq r$
+\While{given new column vector $m_t$}
+	\State $w_t \coloneqq U_t^T m_t$
+	\State $p_t \coloneqq U_t w_t$
+	\State $r_t \coloneqq m_t - p_t \quad (= m_t - U_t\left( U_t^T m_t \right))$ 
+	\State Compute SVD to:
+	\State
+	$
+	\hat{U} \hat{\Sigma} \hat{V}^T = 
+	\begin{bmatrix}
+	\Sigma & p_t \\
+	0 & \left\Vert r_t \right\Vert
+	\end{bmatrix}
+	$
+	\State Update the SVD for the original problem:
+	\State 
+	$U_{t+1} = \begin{bmatrix} U & \frac{r_t}{\left\Vert r_t \right\Vert} \end{bmatrix} \hat{U}$,\,
+	$\Sigma_{t+1} = \hat{\Sigma}$,\,
+	$V_{t+1} = \begin{bmatrix} V & 0 \\ 0 & 1 \end{bmatrix} \hat{V}$.
+	\State Reshape the current SVD to satisfy rank $r$.
+	\State $t \coloneqq t+1$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+\\
+
+
+%-------------------------------------------------------------------------------------------------------%
+%#######################################################################################################%
+%-------------------------------------------------------------------------------------------------------%
+\section{Implementation}
+\subsection{Testcases}
+%-------------------------------------------------------------------------------------------------------%
+%#######################################################################################################%
+%-------------------------------------------------------------------------------------------------------%
+\section{General LA}
+%-------------------------------------------------------------------------------------------------------%
+\subsection{Definitions}
+\subsubsection{Orthogonal matrix}
+An orthogonal matrix is a square matrix, i.e. $n\!\times\! n$, $\mathbf{M}$ with real entries whose columns and rows are orthogonal vectors i.e. unit vectors:
+\begin{equation}
+	\mathbf{M}^T\mathbf{M} = \mathbf{M}\mathbf{M}^T = \mathbf{I},
+\end{equation}
+with $\mathbf{I}$ being the identity matrix.
+\subsubsection{Matrix rank}
+The rank of a matrix $\mathbf{M}$ is the dimension of the vector space generated (spanned) by its columns. This corresponds to the max number of linearly independent columns of $\mathbf{M}$.\\
+For a non-square matrix $(m\!\times\! n)$ one has $rank(\mathbf{M})\leq min(m,n)$.
+\subsubsection{Frobenius norm}
+Todo
+%-------------------------------------------------------------------------------------------------------%
+\printbibliography[heading=bibintoc]
+\end{document}
